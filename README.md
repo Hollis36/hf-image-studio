@@ -46,6 +46,49 @@ short_description: "13-in-1 AI Image Toolkit powered by HF Inference API"
 | 12 | AI Agent | 自然语言指令编排任务链 | Smolagents |
 | 13 | 批量处理 | 多图批量执行同一操作 | 背景移除/超分/描述 |
 
+### 标注工具（新增）
+| # | 功能 | 说明 | 技术 |
+|---|------|------|------|
+| 14 | AI 预标注引擎 | 零样本检测 + 分割 + 描述 + VQA 质检 | OWLv2 / SegFormer / GIT / ViLT |
+
+## HF Auto Annotator（独立应用）
+
+`annotator_app.py` 是一个独立的 **AI 预标注引擎**，定位为 Label Studio / CVAT 的上游预标注工具。
+
+### 核心功能
+
+| 功能 | 说明 | 模型 |
+|------|------|------|
+| 零样本目标检测 | 输入文本类别，自动检测 bounding box | OWLv2-base-patch16 |
+| 语义分割 | 像素级分割 mask | SegFormer-b5 / DETR |
+| 图像描述 | 自动生成标注辅助描述 | GIT-Large / BLIP |
+| VQA 标注质检 | 自动验证标注正确性，标记低置信度 | ViLT VQA |
+
+### 导出格式
+
+- **COCO JSON**：标准格式，可直接导入 Label Studio / FiftyOne / CVAT
+- **YOLO TXT**：坐标归一化，可直接用于 YOLO 训练
+- **CSV**：简洁表格，便于数据分析
+
+### 运行方式
+
+```bash
+export HF_TOKEN="hf_xxxxxxxxxxxxxxxx"
+pip install -r requirements.txt
+# 完整标注引擎
+python annotator_app.py
+# 或使用主应用中的快速入口
+python app.py
+```
+
+### 竞品对比
+
+| 竞品 | 弱点 | HF Auto Annotator 优势 |
+|------|------|------------------------|
+| Label Studio | AI 预标注需自建 ML Backend，配置复杂 | 零配置，HF API 一键调用 |
+| CVAT | 模型市场有限，部署重 | 可调用 HF Hub 上千模型 |
+| Roboflow | $249/月起步 | 免费开源，HF Spaces 零成本部署 |
+
 ## 快速开始
 
 ```bash
@@ -67,3 +110,4 @@ python app.py
 ## License
 
 MIT
+
