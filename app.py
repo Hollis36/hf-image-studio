@@ -513,6 +513,65 @@ def batch_process(files, operation):
 
 
 # ══════════════════════════════════════════════════════════════
+# 14. 标注工具 Auto Annotator (Quick Entry)
+# ══════════════════════════════════════════════════════════════
+
+_DETECTION_MODEL = "google/owlv2-base-patch16-ensemble"
+
+
+def quick_annotate(image, text_prompt):
+    """快速预标注入口：零样本目标检测 + 图像描述"""
+    if image is None:
+        raise gr.Error("请上传图片")
+    if not text_prompt.strip():
+        raise gr.Error("请输入目标类别（如 cat, dog）")
+
+    labels = [lb.strip() for lb in text_prompt.split(",") if lb.strip()]
+    status_lines = []
+    vis = image.copy().convert("RGB")
+    draw = ImageDraw.Draw(vis)
+    colors = ["#FF4444", "#44FF44", "#4444FF", "#FFFF44", "#FF44FF", "#44FFFF"]
+
+    # 零样本检测
+    try:
+        detections = client.zero_shot_object_detection(
+            image=image, candidate_labels=labels, model=_DETECTION_MODEL
+        )
+        for i, det in enumerate(detections or []):
+            box = det.get("box", {})
+            xmin, ymin = box.get("xmin", 0), box.get("ymin", 0)
+            xmax, ymax = box.get("xmax", 0), box.get("ymax", 0)
+            label = det.get("label", "")
+            score = det.get("score", 0)
+            color = colors[i % len(colors)]
+            r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+            draw.rectangle([xmin, ymin, xmax, ymax], outline=(r, g, b), width=2)
+            text = f"{label} {score:.2f}"
+            text_x, text_y = xmin + 2, max(ymin - 13, 0)
+            draw.rectangle(
+                [text_x, text_y, text_x + len(text) * 6 + 4, text_y + 13],
+                fill=(r, g, b),
+            )
+            draw.text((text_x + 2, text_y + 1), text, fill=(255, 255, 255))
+        status_lines.append(f"✅ 检测到 {len(detections or [])} 个目标")
+    except Exception as exc:
+        status_lines.append(f"❌ 检测失败：{exc}")
+
+    # 图像描述
+    try:
+        caption = client.image_to_text(image=image, model="microsoft/git-large-coco")
+        if isinstance(caption, list):
+            caption = caption[0].get("generated_text", str(caption))
+        elif isinstance(caption, dict):
+            caption = caption.get("generated_text", str(caption))
+        status_lines.append(f"✅ 描述：{str(caption)[:80]}")
+    except Exception as exc:
+        status_lines.append(f"❌ 描述失败：{exc}")
+
+    return vis, "\n".join(status_lines)
+
+
+# ══════════════════════════════════════════════════════════════
 #  Gradio 界面
 # ══════════════════════════════════════════════════════════════
 
@@ -739,6 +798,34 @@ with gr.Blocks(title="HF Image Studio") as demo:
                     with gr.Column():
                         bat_gallery = gr.Gallery(label="处理结果", columns=3)
                 bat_btn.click(batch_process, [bat_files, bat_op], bat_gallery)
+
+    # ┌─────────────────────────────────────────────────────────
+    # │ 标注工具
+    # └─────────────────────────────────────────────────────────
+    with gr.Tab("标注工具"):
+        gr.Markdown(
+            """
+            ## AI 预标注引擎（快速入口）
+            输入目标类别，一键完成零样本目标检测 + 图像描述预标注。
+            完整功能（批量标注、COCO JSON / YOLO TXT 导出、VQA 质检）请运行独立的 **annotator_app.py**：
+            ```bash
+            python annotator_app.py
+            ```
+            """
+        )
+        with gr.Row():
+            with gr.Column():
+                ann_img = gr.Image(label="上传图片", type="pil")
+                ann_prompt = gr.Textbox(
+                    label="目标类别（逗号分隔）",
+                    placeholder="cat, dog, person",
+                    lines=1,
+                )
+                ann_btn = gr.Button("▶ 预标注", variant="primary")
+            with gr.Column():
+                ann_vis = gr.Image(label="预标注结果", type="pil")
+                ann_status = gr.Textbox(label="标注摘要", lines=4)
+        ann_btn.click(quick_annotate, [ann_img, ann_prompt], [ann_vis, ann_status])
 
     # ── 底部 ──
     gr.Markdown(
