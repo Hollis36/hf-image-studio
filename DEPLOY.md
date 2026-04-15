@@ -1,6 +1,6 @@
 # HF Image Studio — 部署指南
 
-从零到上线的完整部署流程。
+从零到本地运行或 Hugging Face Spaces 上线的安全部署流程。
 
 ---
 
@@ -17,6 +17,8 @@
 3. 命名为 `image-studio`，权限选 **Read**（足够调用 Inference API）
 4. 复制生成的 `hf_xxxxxxxx` Token，后续要用
 
+> 不要把真实 token 提交到 Git 仓库，也不要写进 README、脚本或截图里。
+
 ### 3. 安装 Git 和 Git LFS
 
 ```bash
@@ -29,6 +31,38 @@ sudo apt install git-lfs
 # 初始化 LFS
 git lfs install
 ```
+
+### 4. 本地环境变量约定
+
+推荐使用未提交的本地环境文件或 shell 环境变量管理 `HF_TOKEN`：
+
+```bash
+cp .env.example .env
+# 然后自行把 HF_TOKEN 写入本地 .env，不要提交 .env
+```
+
+如果你习惯直接在 shell 里设置，也可以：
+
+```bash
+export HF_TOKEN="your_token_here"
+```
+
+---
+
+## 方式零：本地运行
+
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+默认访问地址：
+
+```text
+http://localhost:7860
+```
+
+如果启动后接口全部报认证错误，优先检查 `HF_TOKEN` 是否已经在当前环境中生效。
 
 ---
 
@@ -65,6 +99,8 @@ README.md
    - Name: `HF_TOKEN`
    - Value: 粘贴你的 Access Token
 4. 保存
+
+> `HF_TOKEN` 应该放在 Space secrets 中，而不是写进 `app.py` 或仓库文件。
 
 ### Step 4 — 等待构建
 
@@ -156,7 +192,7 @@ api.upload_folder(
 |------|------|----------|
 | `401 Unauthorized` | HF_TOKEN 未设置或过期 | 检查 Settings → Secrets |
 | `Model is loading` | 模型冷启动中 | 等待 30-60 秒后重试 |
-| `Rate limit exceeded` | 免费 API 调用次数超限 | 等待一段时间，或升级 PRO ($9/月) |
+| `Rate limit exceeded` | API 调用次数超限 | 等待一段时间，或切换更稳的部署方案 |
 | 页面加载但按钮无响应 | 构建未完成 | 查看 Logs 标签确认构建状态 |
 | `503 Service Unavailable` | 模型暂时不可用 | 切换到其他模型选项 |
 
@@ -180,7 +216,7 @@ def text_to_image(prompt, ...):
     ...
 ```
 
-ZeroGPU 的优势是可以加载模型到本地显存（H200 70GB），推理速度更快，不受 API 限制。
+ZeroGPU 的优势是可以把部分推理迁移到 Space 侧，减少对远程 API 的依赖。
 
 ### 绑定自定义域名
 
@@ -200,3 +236,12 @@ hf-image-studio/
 ├── DEPLOY.md           # 本部署文档
 └── ROADMAP.md          # 后续研究方向
 ```
+
+---
+
+## 公开前检查
+
+- [ ] `.env` 没有提交，仓库里只保留 `.env.example`
+- [ ] Space secrets 中使用的是有效且可撤销的 token
+- [ ] README、DEPLOY、日志和截图里没有出现真实 token
+- [ ] 如果启用了额外模型或代理工作流，确认它们适合公开发布
